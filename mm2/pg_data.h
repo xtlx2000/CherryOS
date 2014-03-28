@@ -2,6 +2,7 @@
 #define _PG_DATA_H_
 
 #include "zone.h"
+#include "macro.h"
 
 /*
  * The pg_data_t structure is used in machines with CONFIG_DISCONTIGMEM
@@ -41,6 +42,8 @@ typedef struct pglist_data {
 } pg_data_t;
 
 
+
+pg_data_t pg[NR_CPUS];
 
 int pg_data_init();
 

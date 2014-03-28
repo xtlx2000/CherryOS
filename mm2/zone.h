@@ -360,4 +360,6 @@ struct zone {
 };
 
 
+int zone_init(struct zone *z);
+
 #endif

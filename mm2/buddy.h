@@ -2,4 +2,9 @@
 #define _BUDDY_H_
 
 
+
+
+int buddy_init();
+
+
 #endif
