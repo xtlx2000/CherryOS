@@ -455,8 +455,9 @@ struct hlist_node {
 #define INIT_HLIST_HEAD(ptr) ((ptr)->first = NULL)
 static inline void INIT_HLIST_NODE(struct hlist_node *h)
 {
-	h->next = NULL;
-	h->pprev = NULL;
+	h->next = 0;
+	h->pprev = 0;
+
 }
 
 static inline int hlist_unhashed(const struct hlist_node *h)

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 
 #include "pm.h"
+#include "pg_data.h"
+#include "zone.h"
 #include "buddy.h"
 #include "slab.h"
 

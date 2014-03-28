@@ -1,6 +1,7 @@
 #ifndef _PG_DATA_H_
 #define _PG_DATA_H_
 
+#include "zone.h"
 
 /*
  * The pg_data_t structure is used in machines with CONFIG_DISCONTIGMEM
@@ -34,13 +35,14 @@ typedef struct pglist_data {
     unsigned long node_present_pages; /* total number of physical pages */
     unsigned long node_spanned_pages; /* total size of physical page range, including holes */
     int node_id;
-    wait_queue_head_t kswapd_wait;
+    //wait_queue_head_t kswapd_wait;
     struct task_struct *kswapd;
     int kswapd_max_order;
 } pg_data_t;
 
 
 
+int pg_data_init();
 
 
 

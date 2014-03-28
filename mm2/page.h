@@ -1,7 +1,8 @@
 #ifndef _PAGE_H_
 #define _PAGE_H_
 
-
+#include "macro.h"
+#include "list.h"
 /*
  * Each physical page in the system has a struct page associated with
  * it to keep track of whatever it is we are using the page for at the
