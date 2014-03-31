@@ -19,17 +19,22 @@
 #include "buffer.h"
 
 
-
-
 int main()
 {
 	// 1 mm
+	memory_size = 20 * 1024 * 1024;//20MB
+	memory_pointer = malloc(20 * 1024 * 1024);
+	
 	// 1.1 init page
 	paging_init();
+	
 	// 1.2 init pg_data
-	pg_data_init();
+	long pg_data_size = memory_size / NR_CPUS;
+	pg_data_init(pg_data_size);
+	
 	// 1.3 init buddy
 	buddy_init();
+	
 	// 1.4 init slab
 	slab_init();
 	

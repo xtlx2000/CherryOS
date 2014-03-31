@@ -361,5 +361,8 @@ struct zone {
 
 
 int zone_init(struct zone *z);
+alloc_pages();
+
+
 
 #endif

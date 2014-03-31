@@ -4,7 +4,7 @@ int zonelist_init()
 {
 }
 
-int pg_data_init()
+int pg_data_init(long pg_data_size)
 {
 	int i, j;
 	for(i = 0; i < NR_CPUS; i++){

@@ -14,3 +14,14 @@ int paging_init(int detectsize)
 	}
 	
 }
+
+struct page *pfn_to_page(unsigned long pfn)
+{                                                                                                      
+    return (struct page*)(memory_pointer + (pfn * PAGESIZE));
+}
+
+unsigned long page_to_pfn(struct page *page)
+{
+    return (page - (struct page*)memory_pointer);
+}
+

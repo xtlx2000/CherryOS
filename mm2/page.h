@@ -77,5 +77,10 @@ struct page *mem_map;
 
 int paging_init(int detectsize);
 
+struct page *pfn_to_page(unsigned long pfn);
+unsigned long page_to_pfn(struct page *page);
+
+
+
 
 #endif

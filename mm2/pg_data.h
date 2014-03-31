@@ -45,7 +45,7 @@ typedef struct pglist_data {
 
 pg_data_t pg[NR_CPUS];
 
-int pg_data_init();
+int pg_data_init(long pg_data_size);
 
 
 

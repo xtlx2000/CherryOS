@@ -9,7 +9,12 @@
 #define atomic_t int
 #define u16 unsigned short
 #define u32 unsigned int
+
+
+
 #define pgoff_t int
+#define gfp_t int
+
 
 
 
