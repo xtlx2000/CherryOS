@@ -212,6 +212,8 @@ struct free_area {
     unsigned long       nr_free;
 };
 
+#define PCPBATCH 12
+
 struct per_cpu_pages {																				   
 	int count;		/* number of pages in the list */
 	int high;		/* high watermark, emptying needed */
@@ -361,7 +363,8 @@ struct zone {
 
 
 int zone_init(struct zone *z);
-alloc_pages();
+struct page *alloc_pages(unsigned int order);
+
 
 
 

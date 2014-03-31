@@ -4,13 +4,13 @@
 
 int paging_init(int detectsize)
 {
-	int number = detectsize / PAGESIZE + 1;
+	int number = detectsize / PAGESIZE;
 	mem_map = malloc(sizeof(struct page) * number);
 
 	int i;
 	for(i = 0; i < number; i++){
-		struct page *tmp = &mem_map[i];
-		//TO DO
+		struct page *page = &mem_map[i];
+		page->location = (char *)memory_pointer + i*PAGESIZE;
 	}
 	
 }

@@ -63,6 +63,7 @@ struct page {
 	* WANT_PAGE_VIRTUAL in asm/page.h
 	*/
 	void *virtual;          /* Kernel virtual address (NULL if not kmapped, ie. highmem) */
+	void *location;
 
 };
 
@@ -73,6 +74,11 @@ struct page *mem_map;
 
 
 #define PAGESIZE 4096
+
+
+
+#define page_private(page)      ((page)->private)
+#define set_page_private(page, v)   ((page)->private = (v))
 
 
 int paging_init(int detectsize);

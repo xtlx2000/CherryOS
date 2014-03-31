@@ -17,9 +17,17 @@
 
 
 
-
-
 #define spinlock_t int
+
+
+/*      
+ * Generic compiler-dependent macros required for kernel
+ * build go below this comment. Actual compiler/compiler version
+ * specific implementations come from the above header files
+ */
+
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
 
 
 
