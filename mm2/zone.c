@@ -1,18 +1,21 @@
+#include "pm.h"
 #include "zone.h"
 #include "list.h"
 #include "page.h"
+#include "pg_data.h"
 
 int per_cpu_pages_init(struct per_cpu_pageset *pageset);
 int zone_init_free_lists(struct zone *z);
-struct page *alloc_pages_current(gfp_t gfp, unsigned order);
-struct page *__alloc_pages_node(gfp_t gfp_mask, unsigned int order, struct zonelist *zonelist);
-static struct page *get_page_from_freelist(unsigned int order,struct zonelist *zonelist, int high_zoneidx, int alloc_flags);
+struct page *alloc_pages_current(unsigned order);
+struct page *__alloc_pages_node(unsigned int order, struct zonelist *zonelist);
+static struct page *get_page_from_freelist(unsigned int order,struct zonelist *zonelist);
 struct page *buffered_rmqueue(struct zone *zone, int order);
 struct page *__alloc_pages_slowpath(unsigned int order,struct zonelist *zonelist);
 struct page *__rmqueue_smallest(struct zone *zone, unsigned int order);
 void expand(struct zone *zone, struct page *page, int low, int high, struct free_area *area);
 int rmqueue_bulk(struct zone *zone, unsigned int order, unsigned long count, struct list_head *list);
 struct page *__rmqueue(struct zone *zone, unsigned int order);
+struct page *__alloc_pages_direct_reclaim(unsigned int order);
 
 
 
@@ -61,7 +64,7 @@ int zone_init(struct zone *z)
 			//list_for_each_entry(page, &(z->free_area[order].free_list[0]), lru){
 			//	if(page->location)
 			//}
-			list_add(pfn_to_page(pfn), &(z->free_area[order].free_list[0]));
+			list_add(&(pfn_to_page(pfn)->lru), &(z->free_area[order].free_list[0]));
 			set_page_private(pfn_to_page(pfn), order);
 			
 			leftpage -= (1 << order);
@@ -87,8 +90,8 @@ int zone_init_free_lists(struct zone *z)
 {
 	int order, t;
 	for_each_migratetype_order(order, t) {
-		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);  //初始化链表
-		zone->free_area[order].nr_free = 0;  //初始化nr_free为0
+		INIT_LIST_HEAD(&z->free_area[order].free_list[t]);  //初始化链表
+		z->free_area[order].nr_free = 0;  //初始化nr_free为0
 	}
 }
 
@@ -98,7 +101,8 @@ int per_cpu_pages_init(struct per_cpu_pageset *pageset)
 	pageset->pcp.high = 0;		/* high watermark, emptying needed */
 	pageset->pcp.batch = PCPBATCH;		/* chunk size for buddy add/remove */
 	INIT_LIST_HEAD(&pageset->pcp.list);	/* the list of pages */
-	INIT_LIST_HEAD(&pageset->list);
+
+	return 0;
 }
 
 
@@ -112,7 +116,7 @@ struct page *
 alloc_pages(unsigned int order)
 {    
     if(order >= MAX_ORDER)
-        return NULL;
+        return 0;
 
     return alloc_pages_current(order);
 }
@@ -137,12 +141,12 @@ alloc_pages(unsigned int order)
  *  1) it's ok to take cpuset_sem (can WAIT), and
  *  2) allocating for current task (not interrupt).
  */
-struct page *alloc_pages_current(unsigned order)                                                 
+struct page *alloc_pages_current(unsigned int  order)                                                 
 {
 	//TODO: current
     pg_data_t* pg_data = &pg[0];
 
-    return __alloc_pages_node(order, zonelist);
+    return __alloc_pages_node(order, &(pg[0].node_zonelists[0]));
     
 }
 
@@ -196,7 +200,7 @@ again:
     if (likely(order == 0)) {
         struct per_cpu_pages *pcp;
 
-        pcp = &zone_pcp(zone, cpu)->pcp;
+        pcp = &zone_pcp(zone, cpu).pcp;
         if (!pcp->count) {
             pcp->count = rmqueue_bulk(zone, 0,
                     pcp->batch, &pcp->list);
@@ -205,7 +209,7 @@ again:
         }
 
         if(pcp->count){
-        	page = list_first_entry(&pcp->list, page, lru);
+        	page = list_first_entry(&pcp->list, struct page, lru);
         	list_del(&page->lru);
         	pcp->count--;
         }
@@ -232,7 +236,7 @@ again:
 failed:
     //local_irq_restore(flags);
     //put_cpu();
-    return NULL;
+    return 0;
 }
 
 /*  
@@ -248,7 +252,7 @@ int rmqueue_bulk(struct zone *zone, unsigned int order,
     //spin_lock(&zone->lock);
     for (i = 0; i < count; ++i) {
         struct page *page = __rmqueue(zone, order);
-        if (unlikely(page == NULL))
+        if (unlikely(page == 0))
             break;
 
     /*
@@ -261,7 +265,7 @@ int rmqueue_bulk(struct zone *zone, unsigned int order,
          * properly.
          */
         list_add(&page->lru, list);
-        set_page_private(page);
+        set_page_private(page, order);
         list = &page->lru;
     }
     //spin_unlock(&zone->lock);
@@ -357,7 +361,7 @@ static struct page *__rmqueue_fallback(struct zone *zone, int order,
 
 struct page *__alloc_pages_slowpath(unsigned int order, struct zonelist *zonelist)
 {
-	struct page *page = NULL;
+	struct page *page = 0;
 
 	unsigned long pages_reclaimed = 0;
 	unsigned long did_some_progress;
@@ -369,7 +373,7 @@ struct page *__alloc_pages_slowpath(unsigned int order, struct zonelist *zonelis
 	 * too large. 
 	 *//*参数合法性检查*/
 	if (order >= MAX_ORDER) {  
-		return NULL;  
+		return 0;  
 	}  
 
 	/* 
@@ -381,84 +385,31 @@ struct page *__alloc_pages_slowpath(unsigned int order, struct zonelist *zonelis
 	 * over allocated. 
 	 */  
 
-restart:/*如果调用者没有禁止kswapd，则唤醒该线程进行内存回收。*/  
-	wake_all_kswapd(order, zonelist, high_zoneidx);  
   
-	/* 
-	 * OK, we're below the kswapd watermark and have kicked background 
-	 * reclaim. Now things get more complex, so set up alloc_flags according 
-	 * to how we want to proceed. 
-	 */  
-	 /*根据分配标志确定内部标志，主要是用于水线 */	
-	alloc_flags = gfp_to_alloc_flags(gfp_mask);  
-  
-		/** 
-		  * 与快速分配流程相比，这里的分配标志使用了低的水线。 
-		  * 在进行内存回收操作前，我们使用低水线再尝试分配一下。 
-		  * 当然，不管是否允许ALLOC_NO_WATERMARKS标志，我们都将它清除。 
-		  */  
-	/* This is the last chance, in general, before the goto nopage. */	
-	page = get_page_from_freelist(order, zonelist);  
-	if (page)/*分配成功，找到页面*/  
+	// Try direct reclaim and then allocating */  
+	// 
+	//直接在内存分配上下文中进行内存回收操作。 
+	//	
+	page = __alloc_pages_direct_reclaim(order);  
+	if (page)// 庆幸，回收了一些内存后，满足了上层分配需求
 		goto got_pg;  
-  
-rebalance:	
-	/* Allocate without watermarks if the context allows */  
-/* 某些上下文，如内存回收进程及被杀死的任务，都允许它完全突破水线的限制分配内存。 */  
-	if (alloc_flags & ALLOC_NO_WATERMARKS) {  
-		page = __alloc_pages_high_priority(gfp_mask, order,  
-				zonelist, high_zoneidx, nodemask,  
-				preferred_zone, migratetype);  
-		if (page))/* 在不考虑水线的情况下，分配到了内存 */	
-			goto got_pg;  
-	}  
-  
-	/* Atomic allocations - we can't balance anything */  
-	/* 调用者希望原子分配内存，此时不能等待内存回收，返回NULL */  
-	if (!wait)	
-		goto nopage;  
-  
-	/* Avoid recursion of direct reclaim */  
-/* 调用者本身就是内存回收进程，不能进入后面的内存回收处理流程，否则死锁 */	
-	if (p->flags & PF_MEMALLOC)  
-		goto nopage;  
-  
-	/* Avoid allocations with no watermarks from looping endlessly */  
-	/** 
-	* 当前线程正在被杀死，它可以完全突破水线分配内存。这里向上层返回NULL，是为了避免系统进入死循环。 
-	* 当然，如果上层调用不允许失败，则死循环继续分配，等待其他线程释放一点点内存。 
-	*/	
-	if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))  
-		goto nopage;  
-  
-	/* Try direct reclaim and then allocating */  
-	/** 
-	* 直接在内存分配上下文中进行内存回收操作。 
-	*/	
-	page = __alloc_pages_direct_reclaim(gfp_mask, order,  
-					zonelist, high_zoneidx,  
-					nodemask,  
-					alloc_flags, preferred_zone,  
-					migratetype, &did_some_progress);  
-	if (page))/* 庆幸，回收了一些内存后，满足了上层分配需求 */	
-		goto got_pg;  
-  
-	/* 
-	 * If we failed to make any progress reclaiming, then we are 
-	 * running out of options and have to consider going OOM 
-	 */  
-	/* 内存回收过程没有回收到内存，系统真的内存不足了 */  
-	if (!did_some_progress) {  
-		/** 
-		 * 调用者不是文件系统的代码，允许进行文件系统操作，并且允许重试。  
-		 * 这里需要__GFP_FS标志可能是进入OOM流程后会杀进程或进入panic，需要文件操作。 
-		 */  
+  /*
+	// 
+	// If we failed to make any progress reclaiming, then we are 
+	// running out of options and have to consider going OOM 
+	//  
+	//内存回收过程没有回收到内存，系统真的内存不足了
+	if (!did_some_progress) {
+		//
+		// 调用者不是文件系统的代码，允许进行文件系统操作，并且允许重试。  
+		// 这里需要__GFP_FS标志可能是进入OOM流程后会杀进程或进入panic，需要文件操作。 
+		//  
 		if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY)) {  
-			if (oom_killer_disabled)/* 系统禁止了OOM，向上层返回NULL */  
+			if (oom_killer_disabled)// 系统禁止了OOM，向上层返回NULL 
 				goto nopage;  
-			/** 
-			 * 杀死其他进程后再尝试分配内存 
-			 */  
+			//
+			// 杀死其他进程后再尝试分配内存 
+			// 
 			page = __alloc_pages_may_oom(gfp_mask, order,  
 					zonelist, high_zoneidx,  
 					nodemask, preferred_zone,  
@@ -466,12 +417,12 @@ rebalance:
 			if (page)  
 				goto got_pg;  
   
-			/* 
-			 * The OOM killer does not trigger for high-order 
-			 * ~__GFP_NOFAIL allocations so if no progress is being 
-			 * made, there are no other options and retrying is 
-			 * unlikely to help. 
-			 */)/* 要求的页面数量较多，再试意义不大 */	
+			//
+			// The OOM killer does not trigger for high-order 
+			// ~__GFP_NOFAIL allocations so if no progress is being 
+			// made, there are no other options and retrying is 
+			// unlikely to help. 
+			// 要求的页面数量较多，再试意义不大 
 			if (order > PAGE_ALLOC_COSTLY_ORDER &&	
 						!(gfp_mask & __GFP_NOFAIL))  
 				goto nopage;  
@@ -479,18 +430,21 @@ rebalance:
 			goto restart;  
 		}  
 	}  
+	
   
-	/* Check if we should retry the allocation */  
- /* 内存回收过程回收了一些内存，接下来判断是否有必要继续重试 */  
+	// Check if we should retry the allocation 
+ 	// 内存回收过程回收了一些内存，接下来判断是否有必要继续重试
 	pages_reclaimed += did_some_progress;  
 	if (should_alloc_retry(gfp_mask, order, pages_reclaimed)) {  
-		/* Wait for some write requests to complete then retry */  
+		//Wait for some write requests to complete then retry 
 		congestion_wait(BLK_RW_ASYNC, HZ/50);  
 		goto rebalance;  
 	}  
+	*/
   
 nopage:  
-/* 内存分配失败了，打印内存分配失败的警告 */  
+//内存分配失败了，打印内存分配失败的警告 
+/*
 	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {  
 		printk(KERN_WARNING "%s: page allocation failure."	
 			" order:%d, mode:0x%x\n",  
@@ -498,14 +452,20 @@ nopage:
 		dump_stack();  
 		show_mem();  
 	}  
+	*/
 	return page;  
 got_pg:  
-	/* 运行到这里，说明成功分配了内存，这里进行内存检测调试 */	
-	if (kmemcheck_enabled)	
-		kmemcheck_pagealloc_alloc(page, order, gfp_mask);  
+	// 运行到这里，说明成功分配了内存，这里进行内存检测调试 
+	
 	return page;  
   
 
+}
+
+struct page *__alloc_pages_direct_reclaim(unsigned int order)
+{
+	//TODO
+	return 0;
 }
 
 
@@ -515,7 +475,6 @@ got_pg:
  */  
  /*从给定的order开始，从小到大遍历； 
   找到后返回页面基址，合并分割后的空间*/  
-static inline  
 struct page *__rmqueue_smallest(struct zone *zone, unsigned int order)  
 {  
 	unsigned int current_order;  
@@ -540,7 +499,7 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order)
 		return page;  
 	}  
   
-	return NULL;  
+	return 0;  
 }  
 
 
@@ -563,7 +522,7 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order)
  /*此函数主要用于下面这种情况: 
   分配函数从high中分割出去了low大小的内存； 
   然后要将high留下的内存块合并放到伙伴系统中；*/  
-static inline void expand(struct zone *zone, struct page *page,  
+void expand(struct zone *zone, struct page *page,  
 	int low, int high, struct free_area *area)  
 {  
 	unsigned long size = 1 << high;  
@@ -573,11 +532,11 @@ static inline void expand(struct zone *zone, struct page *page,
 		area--;/*减一到order减一的area*/  
 		high--;/*order减一*/  
 		size >>= 1;/*大小除以2*/  
-		VM_BUG_ON(bad_range(zone, &page[size]));  
+		//VM_BUG_ON(bad_range(zone, &page[size]));  
 		/*加到指定的伙伴系统中*/  
-		list_add(&page[size].lru, &area->free_list[migratetype]);  
+		list_add(&page[size].lru, &area->free_list[0]);  
 		area->nr_free++;/*空闲块加一*/	
-		set_page_order(&page[size], high);/*设置相关order*/
+		set_page_private(&page[size], high);/*设置相关order*/
 	}  
 }
 

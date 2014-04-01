@@ -1,6 +1,7 @@
 #ifndef _ZONE_H_
 #define _ZONE_H_
 
+#include "mm.h"
 #include "macro.h"
 #include "list.h"
 
@@ -255,8 +256,6 @@ struct zone {
      */
     unsigned long       min_unmapped_pages;
     unsigned long       min_slab_pages;
-    struct per_cpu_pageset  *pageset[NR_CPUS];
-#else
     struct per_cpu_pageset  pageset[NR_CPUS];
 #endif
     /*   

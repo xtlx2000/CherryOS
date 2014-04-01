@@ -1,42 +1,44 @@
+flag = -g
+
 mm:main.o buddy.o buffer.o cache.o ext2.o page.o pg_data.o pm.o slab.o vfs.o vm.o zone.o
-	gcc -o os main.o buddy.o buffer.o cache.o ext2.o page.o pg_data.o pm.o slab.o vfs.o vm.o zone.o
+	gcc $(flag) -o os main.o buddy.o buffer.o cache.o ext2.o page.o pg_data.o pm.o slab.o vfs.o vm.o zone.o
 
 mian.o:
-	gcc -c main.c
+	gcc $(flag) -c main.c
 
 
 buddy.o:buddy.c
-	gcc -c buddy.c
+	gcc $(flag) -c buddy.c
 
 buffer.o:
-	gcc -c buffer.c
+	gcc $(flag) -c buffer.c
 
 cache.o:
-	gcc -c cache.c
+	gcc $(flag) -c cache.c
 
 ext2.o:
-	gcc -c ext2.c
+	gcc $(flag) -c ext2.c
 
 page.o:
-	gcc -c page.c
+	gcc $(flag) -c page.c
 
 pg_data.o:
-	gcc -c pg_data.c
+	gcc $(flag) -c pg_data.c
 
 pm.o:
-	gcc -c pm.c
+	gcc $(flag) -c pm.c
 
 slab.o:
-	gcc -c slab.c
+	gcc $(flag) -c slab.c
 
 vfs.o:
-	gcc -c vfs.c
+	gcc $(flag) -c vfs.c
 
 vm.o:
-	gcc -c vm.c
+	gcc $(flag) -c vm.c
 
 zone.o:
-	gcc -c zone.c
+	gcc $(flag) -c zone.c
 
 
 clean:
