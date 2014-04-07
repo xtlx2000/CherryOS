@@ -63,7 +63,7 @@ struct page {
 	* WANT_PAGE_VIRTUAL in asm/page.h
 	*/
 	void *virtual;          /* Kernel virtual address (NULL if not kmapped, ie. highmem) */
-	void *location;
+	void *location;			/* physical memory address */
 
 };
 
@@ -73,7 +73,14 @@ void *buffer;
 struct page *mem_map;
 
 
-#define PAGESIZE 4096
+#define PAGE_SHIFT	12
+
+#define PAGESIZE	(1<<PAGE_SHIFT)
+
+
+#define __pa(addr) 	\
+	(((unsigned long)addr - (unsigned long)memory_pointer) / 4096)
+
 
 
 
@@ -81,10 +88,19 @@ struct page *mem_map;
 #define set_page_private(page, v)   ((page)->private = (v))
 
 
-int paging_init(int detectsize);
+#define virt_to_page(kaddr)	\
+	pfn_to_page(__pa(kaddr))
+
+
+
+int paging_init(long detectsize);
 
 struct page *pfn_to_page(unsigned long pfn);
 unsigned long page_to_pfn(struct page *page);
+struct page *pfn_to_page2(unsigned long pfn);
+unsigned long page_to_pfn2(struct page *page);
+
+
 
 
 

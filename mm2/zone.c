@@ -16,6 +16,29 @@ void expand(struct zone *zone, struct page *page, int low, int high, struct free
 int rmqueue_bulk(struct zone *zone, unsigned int order, unsigned long count, struct list_head *list);
 struct page *__rmqueue(struct zone *zone, unsigned int order);
 struct page *__alloc_pages_direct_reclaim(unsigned int order);
+void __free_pages(struct page *page, unsigned int order);
+int put_page_testzero(struct page *page);
+void free_hot_page(struct page *page);
+void free_hot_cold_page(struct page *page, int cold);
+void free_pages_bulk(struct zone *zone, int count,
+                    struct list_head *list, int order);
+void __free_one_page(struct page *page,
+        struct zone *zone, unsigned int order);
+struct page *__page_find_buddy(struct page *page, unsigned long page_idx, unsigned int order);
+int page_is_buddy(struct page *page, struct page *buddy, int order);
+unsigned long page_order(struct page *page);
+unsigned long __find_combined_index(unsigned long page_idx, unsigned int order);
+void __free_pages_ok(struct page *page, unsigned int order);
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -24,7 +47,7 @@ struct page *__alloc_pages_direct_reclaim(unsigned int order);
 
 
 
-int zone_init(struct zone *z)
+int zone_init(struct zone *z, long pfn, long memory_size)
 {
 	z->pages_min = 0;
 	z->pages_low = 0;
@@ -46,9 +69,9 @@ int zone_init(struct zone *z)
 	zone_init_free_lists(z);
 
 	//add ram to buddy
-	int left = memory_size;
-	int leftpage = memory_size / PAGESIZE;
-	int pfn = 0;
+	long left = memory_size;
+	long leftpage = memory_size / PAGESIZE;
+
 	while(leftpage > 0){
 
 		int order = MAX_ORDER-1;
@@ -75,11 +98,34 @@ int zone_init(struct zone *z)
 		
 	}
 
+	char *name = (char *)malloc(sizeof("name"));
+	memset(name, "name", sizeof("name"));
+	z->name = name;
+	
+
+	//statistics and print
+	buddystatistics(z);
+	
+
 
 
 	
 	return 0;
 }
+
+int buddystatistics(struct zone *z)
+{
+	int total_pages = 0;
+	int i;
+	for(i = 0; i < MAX_ORDER; i++){
+		total_pages += z->free_area[i].nr_free * (1 << i);
+		DEBUG("      order %d have %d objects(%d pages).\n", i, z->free_area[i].nr_free, z->free_area[i].nr_free * (1 << i));
+	}
+	DEBUG("      Total have %d pages.\n", total_pages);
+
+}
+
+
 
 #define for_each_migratetype_order(order, type) \
 	for (order = 0; order < MAX_ORDER; order++) \
@@ -539,4 +585,263 @@ void expand(struct zone *zone, struct page *page,
 		set_page_private(&page[size], high);/*设置相关order*/
 	}  
 }
+
+
+
+void free_pages(unsigned long addr, unsigned int order)
+{
+	if (addr != 0) {  	
+		__free_pages(virt_to_page(addr), order);/*具体的释放函数*/	
+	}
+
+}
+
+
+
+
+void __free_pages(struct page *page, unsigned int order)
+{
+	if (put_page_testzero(page)) {/*count值减一为0时释放*/	
+		/*调试*/  
+		//trace_mm_page_free_direct(page, order);  
+		if (order == 0)  
+			free_hot_page(page);/*释放单个页面*/  
+		else  
+			__free_pages_ok(page, order);
+	}  
+
+}
+
+/*
+ * Methods to modify the page usage count.
+ *
+ * What counts for a page usage:
+ * - cache mapping   (page->mapping)
+ * - private data    (page->private)
+ * - page mapped in a task's page tables, each mapping
+ *   is counted separately
+ *
+ * Also, many kernel routines increase the page count before a critical
+ * routine so they can be sure the page doesn't go away from under them.
+ */
+
+/*
+ * Drop a ref, return true if the refcount fell to zero (the page has no users)
+ */
+int put_page_testzero(struct page *page)
+{
+    return atomic_dec_and_test(&page->_count);
+} 
+
+int atomic_dec_and_test(atomic_t *v)
+{
+    int ret,flags;
+    //local_irq_save(flags);
+    --(*v);
+    ret = *v;
+    //local_irq_restore(flags);
+    return ret == 0;
+} 
+
+void free_hot_page(struct page *page)
+{
+    free_hot_cold_page(page, 0/* cold or hot */);                                                                            
+}
+
+/*                                                                                                          
+ * Free a 0-order page
+ */
+void free_hot_cold_page(struct page *page, int cold)
+{
+    struct zone *zone = &(pg[0].node_zones[ZONE_NORMAL]);
+    struct per_cpu_pages *pcp;
+    unsigned long flags;
+
+	/*
+    if (PageAnon(page))
+        page->mapping = NULL;
+    if (free_pages_check(page))
+        return;
+
+    if (!PageHighMem(page)) {
+        debug_check_no_locks_freed(page_address(page), PAGE_SIZE);
+        debug_check_no_obj_freed(page_address(page), PAGE_SIZE);
+    }
+    arch_free_page(page, 0);
+    kernel_map_pages(page, 1, 0);//trace
+    */
+
+	/*获得zone对应cpu的pcp*/  
+    pcp = &zone_pcp(zone, 0).pcp;
+    //local_irq_save(flags);
+    //__count_vm_event(PGFREE);
+
+    //cold page
+    if (cold)
+        list_add_tail(&page->lru, &pcp->list);
+    else//hot page
+        list_add(&page->lru, &pcp->list);
+    set_page_private(page, 0);
+    pcp->count++;
+    if (pcp->count >= pcp->high) {
+        free_pages_bulk(zone, pcp->batch, &pcp->list, 0);
+        pcp->count -= pcp->batch;
+    }          
+    //local_irq_restore(flags);  
+    //put_cpu(); 
+}
+
+/*
+ * Frees a list of pages. 
+ * Assumes all pages on list are in same zone, and of same order.
+ * count is the number of pages to free.
+ *
+ * If the zone was previously in an "all pages pinned" state then look to
+ * see if this freeing clears that state.
+ *
+ * And clear the zone's pages_scanned counter, to hold off the "all pages are
+ * pinned" detection logic.
+ */
+void free_pages_bulk(struct zone *zone, int count,
+                    struct list_head *list, int order)
+{
+    //spin_lock(&zone->lock);
+    zone->pages_scanned = 0;
+    while (count--) {
+        struct page *page;
+
+        //VM_BUG_ON(list_empty(list));
+        page = list_entry(list->prev, struct page, lru);
+        /* have to delete it as __free_one_page list manipulates */
+        list_del(&page->lru);
+        __free_one_page(page, zone, order);
+    }   
+    //spin_unlock(&zone->lock);
+} 
+
+
+/*
+ * Freeing function for a buddy system allocator.
+ *
+ * The concept of a buddy system is to maintain direct-mapped table
+ * (containing bit values) for memory blocks of various "orders".
+ * The bottom level table contains the map for the smallest allocatable
+ * units of memory (here, pages), and each level above it describes
+ * pairs of units from the levels below, hence, "buddies".
+ * At a high level, all that happens here is marking the table entry
+ * at the bottom level available, and propagating the changes upward
+ * as necessary, plus some accounting needed to play nicely with other
+ * parts of the VM system.
+ * At each level, we keep a list of pages, which are heads of continuous
+ * free pages of length of (1 << order) and marked with PG_buddy. Page's
+ * order is recorded in page_private(page) field.
+ * So when we are allocating or freeing one, we can derive the state of the
+ * other.  That is, if we allocate a small block, and both were   
+ * free, the remainder of the region must be split into blocks.   
+ * If a block is freed, and its buddy is also free, then this
+ * triggers coalescing into a block of larger size.            
+ *
+ * -- wli
+ */
+
+void __free_one_page(struct page *page,
+        struct zone *zone, unsigned int order)
+{                                                                                                                                                                                                                                
+    unsigned long page_idx;
+    int order_size = 1 << order;
+    int migratetype = 0;
+
+	/*
+    if (unlikely(PageCompound(page)))//要释放的页是巨页的一部分
+    	//解决巨页标志，如果巨页标志有问题，则退出
+        destroy_compound_page(page, order);
+        */
+
+	//将页面转化为全局页面数组的下标
+    page_idx = page_to_pfn(page) & ((1 << MAX_ORDER) - 1);
+
+
+    //__mod_zone_page_state(zone, NR_FREE_PAGES, order_size);
+   
+    while (order < MAX_ORDER-1) {
+        unsigned long combined_idx;
+        struct page *buddy;
+
+		//找出page页面的伙伴
+		//查找待释放页块的伙伴 ,其中伙伴系统中每个块
+		//都有一个对应同样大小的"伙伴块"(由2的指数原理知)
+        buddy = __page_find_buddy(page, page_idx, order);
+        if (!page_is_buddy(page, buddy, order))
+            break;
+
+        /* Our buddy is free, merge with it and move up one order. */
+        list_del(&buddy->lru);
+        zone->free_area[order].nr_free--;
+		set_page_private(buddy, 0);
+		combined_idx = __find_combined_index(page_idx, order);
+		page = page + (combined_idx - page_idx);
+		page_idx = combined_idx;
+		order++;
+	}
+	
+	set_page_private(page, order);
+	list_add(&page->lru,
+		&zone->free_area[order].free_list[migratetype]);
+	zone->free_area[order].nr_free++;
+}
+
+struct page *  
+__page_find_buddy(struct page *page, unsigned long page_idx, unsigned int order)  
+{  
+  /*伙伴的计算原理， 
+    *实际上，使用(1<<order)掩码的异或(XOR)转换page_idx第order位 
+    *的值。因此，如果这个位原来是0，buddy_idx就等于page_idx+order 
+    *相反，如果这个位原先是1，buddy_idx就等于page_idx-order 
+    *此计算出来的伙伴为在mem_map中的下标 
+    */    
+    unsigned long buddy_idx = page_idx ^ (1 << order);  
+    /*返回伙伴块的页面基址*/  
+    return page + (buddy_idx - page_idx);  
+}
+
+int page_is_buddy(struct page *page, struct page *buddy, int order)  
+{  
+  
+    //if (page_zone_id(page) != page_zone_id(buddy))/*验证page和他的buddy是否在同一个zone中*/  
+    //    return 0;  
+    /*验证相关位和buddy的order值*/  
+    /* 通过检查PG_buddy 标志位判断buddy是否在伙伴系统中，并且buddy是否在order级的 
+     链表中，page的private成员存放页块所在链表的order。*/  
+    if (/* PageBuddy(buddy) && */page_order(buddy) == order) {  
+        //VM_BUG_ON(page_count(buddy) != 0);  
+        return 1;  
+    }  
+    return 0;  
+}  
+
+/*
+ * function for dealing with page's order in buddy system.
+ * zone->lock is already acquired when we use these.
+ * So, we don't need atomic page->flags operations here.
+ */
+unsigned long page_order(struct page *page)
+{
+    return page_private(page);
+} 
+
+
+unsigned long
+__find_combined_index(unsigned long page_idx, unsigned int order)                          
+{
+    return (page_idx & ~(1 << order));
+}
+
+
+
+void __free_pages_ok(struct page *page, unsigned int order)
+{
+	//TODO
+} 
+
+
 

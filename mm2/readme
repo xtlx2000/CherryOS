@@ -1,0 +1,11 @@
+pysical memory management complete.
+buddy systm init complete.
+buddy system alloc complete.
+buddy system reclaim coding complete, test not finish. TODO
+
+slab system init complete.
+slab system alloc complete.
+slab system reclaim complete.
+
+
+

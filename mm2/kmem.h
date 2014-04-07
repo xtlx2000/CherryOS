@@ -1,8 +1,8 @@
 #ifndef _KMEM_H_
 #define _KMEM_H_
 
-#define DEBUG 0
-#define PRINT_DEBUG(fmt, args...)    if(DEBUG)printf(fmt, ## args)
+#include "macro.h"
+
 
 struct kmem_bufctl;
 
