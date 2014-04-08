@@ -1,6 +1,6 @@
 #ifndef _MACRO_H_
 #define _MACRO_H_
-
+#include <stdio.h>
 
 #define NR_CPUS 	2
 
@@ -30,6 +30,12 @@
 
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
+
+
+
+#define DEBUG 1
+#define PRINT_DEBUG(fmt, args...)    if(DEBUG)printf(fmt, ## args)
+
 
 
 
