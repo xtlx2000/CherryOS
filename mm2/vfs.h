@@ -3,6 +3,9 @@
 
 #include "device.h"
 
+#include "radix.h"
+#include "prio_tree.h"
+
 
 struct path {                                                                                               
     struct vfsmount *mnt;
@@ -12,7 +15,7 @@ struct path {
 
 struct fs_struct {                                                                                          
     atomic_t count;
-    rwlock_t lock;
+    //rwlock_t lock;
     int umask;
     struct path root, pwd;
 };
@@ -160,6 +163,22 @@ struct mnt_namespace {
 };
 
 
+/*
+ *  Berkeley style UIO structures   -   Alan Cox 1994.
+ *
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
+ */
+
+struct iovec                                                                                                
+{
+    void *iov_base;  /* BSD uses caddr_t (1003.1g requires void *) */
+    u32 iov_len; /* Must be size_t (1003.1g) */
+};
+
+
 /* is there a better place to document function pointer methods? */
 /**
  * ki_retry -   iocb forward progress callback
@@ -208,11 +227,11 @@ struct kiocb {
 
     union {
         void      *user;
-        struct task_struct  *tsk;
+        //struct task_struct  *tsk;
     } ki_obj;                                                                       
 
     u64           ki_user_data;   /* user's data for completion */
-    wait_queue_t        ki_wait;
+    //wait_queue_t        ki_wait;
     loff_t          ki_pos;
 
     void            *private;
@@ -237,20 +256,25 @@ struct kiocb {
 };
 
 
-/*
- *  Berkeley style UIO structures   -   Alan Cox 1994.
- *
- *      This program is free software; you can redistribute it and/or
- *      modify it under the terms of the GNU General Public License
- *      as published by the Free Software Foundation; either version
- *      2 of the License, or (at your option) any later version.
- */
 
-struct iovec                                                                                                
-{
-    void *iov_base;  /* BSD uses caddr_t (1003.1g requires void *) */
-    u32 iov_len; /* Must be size_t (1003.1g) */
-};
+/*
+ * The POSIX file lock owner is determined by
+ * the "struct files_struct" in the thread group
+ * (or NULL for no owner - BSD locks).
+ *
+ * Lockd stuffs a "host" pointer into this.
+ */
+typedef struct files_struct *fl_owner_t;
+
+
+
+/*
+ * This is the "filldir" function type, used by readdir() to let
+ * the kernel specify what kind of dirent layout it wants to have.
+ * This allows the kernel to read directories into kernel space or
+ * to have different dirent layouts depending on the binary type.
+ */
+typedef int (*filldir_t)(void *, const char *, int, loff_t, u64, unsigned);
 
 
 /*
@@ -346,7 +370,7 @@ struct super_block {
 	unsigned long		s_magic;/*文件系统的魔术*/	
 	struct dentry		*s_root;/*文件系统根目录的目录项对象*/	
 	//struct rw_semaphore s_umount;/*卸载用的信号量*/  
-	struct mutex		s_lock;/*超级块信号量*/  
+	//struct mutex		s_lock;/*超级块信号量*/  
 	int 		s_count;/*引用计数*/  
 	int 		s_need_sync;/*表示对超级快的索引节点进行同步标志*/	
 	atomic_t		s_active;/*次级引用计数*/  
@@ -367,8 +391,7 @@ anonymous dentries for (nfs) exporting */
 	struct backing_dev_info *s_bdi;/* */  
 	//struct mtd_info 	*s_mtd;/**/  
 	struct list_head	s_instances;/*用于指定文件系统类型的超级快对象链表指针*/  
-	//struct quota_info	s_dquot;/*磁盘限额的描述符*/	/* Diskquota specific options  
-*/	
+	//struct quota_info	s_dquot;/*磁盘限额的描述符*/	/* Diskquota specific options  */	
   
 	int 		s_frozen;/*冻结文件系统时使用的标志*/  
 	wait_queue_head_t	s_wait_unfrozen;/*进程挂起的等待队列，直到文件系统被冻结*/	
@@ -447,7 +470,7 @@ struct super_operations {
 
 struct address_space {
     struct inode        *host;      /* owner: inode, block_device */
-    struct radix_tree_root  page_tree;  /* radix tree of all pages */
+    struct rxt_node  page_tree;  /* radix tree of all pages */
     spinlock_t      tree_lock;  /* and lock protecting it */
     unsigned int        i_mmap_writable;/* count VM_SHARED mappings */
     struct prio_tree_root   i_mmap;     /* tree of private and shared mappings */
@@ -501,7 +524,7 @@ maybe i_size */
 	const struct inode_operations	*i_op;/*索引节点的操作*/  
 	const struct file_operations	*i_fop;/*缺省文件操作*/   /* former ->i_op-> default_file_ops */  
 	struct super_block	*i_sb;/*指向超级快对象的指针*/	
-	struct file_lock	*i_flock;/*指向文件锁链表的指针*/  
+	//struct file_lock	*i_flock;/*指向文件锁链表的指针*/  
 	struct address_space	*i_mapping;/*指向address_space对象的指针?*/  
 	struct address_space	i_data;/*文件的address_space对象*/	
 #ifdef CONFIG_QUOTA  
@@ -509,9 +532,9 @@ maybe i_size */
 #endif	
 	struct list_head	i_devices;/*用于具体的字符或块设备索引节点链表指针*/  
 	union {  
-		struct pipe_inode_info	*i_pipe;/*如果文件是一个管道，则使用他8、*/  
+		//struct pipe_inode_info	*i_pipe;/*如果文件是一个管道，则使用他8、*/  
 		struct block_device *i_bdev;/*指向块设备驱动的指针*/  
-		struct cdev 	*i_cdev;/*指向字符设备驱动的指针*/	
+		//struct cdev 	*i_cdev;/*指向字符设备驱动的指针*/	
 	};	
   
 	u32			i_generation;/*索引节点版本号*/  
@@ -555,7 +578,7 @@ struct inode_operations {
     int (*rmdir) (struct inode *,struct dentry *);
     int (*mknod) (struct inode *,struct dentry *,int,dev_t);
     int (*rename) (struct inode *, struct dentry *, struct inode *, struct dentry *);
-    int (*readlink) (struct dentry *, char __user *,int);
+    int (*readlink) (struct dentry *, char *,int);
     void * (*follow_link) (struct dentry *, struct nameidata *);//根据符号链接查找目标文件的inode。因为符号链接可能是跨文件系统边界的，该例程的实现通常非常短，实际工作很快委托给一般的VFS例程完成。
     void (*put_link) (struct dentry *, struct nameidata *, void *);
     void (*truncate) (struct inode *);//修改指定inode的长度。该函数只接受一个参数，即所处理的inode的数据结构。在调用该函数之前，必须将新的文件长度手工设置到inode结构的i_size成员。
@@ -583,20 +606,20 @@ struct file {
 	 */  
 	union {  
 		struct list_head	fu_list;  //每个超级块都提供了一个s_list成员作为表头，以建立file对象的链表，链表元素是file->f_list。该链表包含该超级块表示的文件系统的所有打开文件。例如，在以读、写模式装载的文件系统以只读模式重新装载时，会扫描该链表。当然，如果仍然有按写模式打开的文件，是无法重新装载的，因而内核需要检查该链表来确认。
-		struct rcu_head 	fu_rcuhead;  
+		struct list_head 	fu_rcuhead;  
 	} f_u;	
 	struct path 	f_path;  //封装了（1）文件名和inode之间的关联（2）文件所在文件系统之间的有关信息
 #define f_dentry	f_path.dentry  
 #define f_vfsmnt	f_path.mnt	
 	const struct file_operations	*f_op;	//指定了文件操作调用的各个函数
 	spinlock_t		f_lock;  /* f_ep_links, f_flags, no IRQ */	
-	atomic_long_t		f_count;  
+	atomic_t		f_count;  
 	unsigned int		f_flags;  
-	fmode_t 		f_mode;/*打开文件的模式*/  
+	u32 		f_mode;/*打开文件的模式*/  
 	loff_t			f_pos;/*文件的读写位置*/  
-	struct fown_struct	f_owner;  //f_owner包含了处理该文件的进程有关的信息（因而也确定了SIGIO信号发送的目标pid，以实现异步IO）。
-	const struct cred	*f_cred;  
-	struct file_ra_state	f_ra; //预读特征保存在f_ra。这些值指定了在实际请求文件数据之前，是否预读文件数据、如果预读（预读可以提供系统系能）、 
+	//struct fown_struct	f_owner;  //f_owner包含了处理该文件的进程有关的信息（因而也确定了SIGIO信号发送的目标pid，以实现异步IO）。
+	//const struct cred	*f_cred;  
+	//struct file_ra_state	f_ra; //预读特征保存在f_ra。这些值指定了在实际请求文件数据之前，是否预读文件数据、如果预读（预读可以提供系统系能）、 
   
 	u64 		f_version;	//由文件系统使用，以检查一个file实例是否仍然与相关的inode内容兼容。这对于确保已缓存对象的一致性很重要。
 #ifdef CONFIG_SECURITY	
@@ -622,18 +645,26 @@ struct file_system_type {
 	int (*get_sb) (struct file_system_type *, int,	
 			   const char *, void *, struct vfsmount *);/*读超级快的方法*/	
 	void (*kill_sb) (struct super_block *);/*删除超级块的方法*/  
-	struct module *owner;/*指向实现文件系统的模块指针*/  
+	//struct module *owner;/*指向实现文件系统的模块指针*/  
 	struct file_system_type * next;/*指向文件系统类型链表中下一个元素的指针*/  
 	struct list_head fs_supers;/*具有相同文件系统类型的超级块对象链表头*/  
   
-	struct lock_class_key s_lock_key;  
-	struct lock_class_key s_umount_key;  
+	//struct lock_class_key s_lock_key;  
+	//struct lock_class_key s_umount_key;  
   
-	struct lock_class_key i_lock_key;  
-	struct lock_class_key i_mutex_key;	
-	struct lock_class_key i_mutex_dir_key;	
-	struct lock_class_key i_alloc_sem_key;	
+	//struct lock_class_key i_lock_key;  
+	//struct lock_class_key i_mutex_key;	
+	//struct lock_class_key i_mutex_dir_key;	
+	//struct lock_class_key i_alloc_sem_key;	
 };	
+
+
+struct file_system_type file_system_type_root;
+struct vfsmount vfsmntlist;
+
+
+
+int vfs_init();
 
 
 

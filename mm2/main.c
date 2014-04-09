@@ -12,8 +12,7 @@
 
 
 
-#include "vfs.h"
-#include "ext2.h"
+#include "fs.h"
 
 
 #include "cache.h"
@@ -107,6 +106,8 @@ int main()
 
 
 	// 2 fs
+	PRINT_DEBUG("\n================== FS Test ===========\n");
+	fs_init();
 
 
 	// 3 buffer cache

@@ -1,7 +1,7 @@
 flag = -g
 
-mm:main.o buddy.o buffer.o cache.o ext2.o page.o pg_data.o pm.o slab.o kmem.o vfs.o vm.o zone.o
-	gcc  $(flag) -o os main.o buddy.o buffer.o cache.o ext2.o page.o pg_data.o pm.o slab.o kmem.o vfs.o vm.o zone.o
+mm:main.o buddy.o buffer.o cache.o ext2.o page.o pg_data.o pm.o slab.o kmem.o fs.o vfs.o vm.o zone.o radix.o prio_tree.o  rbtree.o
+	gcc  $(flag) -o os main.o buddy.o buffer.o cache.o ext2.o page.o pg_data.o pm.o slab.o kmem.o fs.o vfs.o vm.o zone.o radix.o prio_tree.o  rbtree.o
 
 mian.o:
 	gcc  $(flag)  -c main.c
@@ -33,6 +33,9 @@ slab.o:
 kmem.o:
 	gcc  $(flag)  -c kmem.c
 
+fs.o:
+	gcc  $(flag)  -c fs.c
+
 vfs.o:
 	gcc  $(flag)  -c vfs.c
 
@@ -41,6 +44,16 @@ vm.o:
 
 zone.o:
 	gcc  $(flag)  -c zone.c
+
+radix.o:
+	gcc  $(flag)  -c radix.c
+
+prio_tree.o:
+	gcc  $(flag)  -c prio_tree.c
+
+rbtree.o:
+	gcc  $(flag)  -c rbtree.c
+
 
 
 clean:

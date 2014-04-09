@@ -11,9 +11,9 @@
  * 02Feb2004	Initial version
  */
 
-#include <linux/init.h>
-#include <linux/mm.h>
-#include <linux/prio_tree.h>
+#include "prio_tree.h"
+#include "page.h"
+#include "vm.h"
 
 /*
  * A clever mix of heap and radix trees forms a radix priority search tree (PST)
@@ -68,7 +68,7 @@ static void get_index(const struct prio_tree_root *root,
 
 static unsigned long index_bits_to_maxindex[BITS_PER_LONG];
 
-void __init prio_tree_init(void)
+void /* init */ prio_tree_init(void)
 {
 	unsigned int i;
 

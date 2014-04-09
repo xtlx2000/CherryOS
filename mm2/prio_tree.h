@@ -1,6 +1,8 @@
 #ifndef _LINUX_PRIO_TREE_H
 #define _LINUX_PRIO_TREE_H
 
+#include "macro.h"
+
 /*
  * K&R 2nd ed. A8.3 somewhat obliquely hints that initial sequences of struct
  * fields with identical types should end up at the same location. We'll use

@@ -1,6 +1,7 @@
 #ifndef _MACRO_H_
 #define _MACRO_H_
 #include <stdio.h>
+#include "list.h"
 
 #define NR_CPUS 	2
 
@@ -53,6 +54,34 @@ struct __wait_queue_head {
 };  
 typedef struct __wait_queue_head wait_queue_head_t;
 
+
+#define BITS_PER_LONG 32
+
+
+#define USHORT_MAX  ((u16)(~0U))
+#define SHORT_MAX   ((u16)(USHORT_MAX>>1))
+#define SHORT_MIN   (-SHORT_MAX - 1)
+#define INT_MAX     ((int)(~0U>>1))
+#define INT_MIN     (-INT_MAX - 1)
+#define UINT_MAX    (~0U)
+#define LONG_MAX    ((long)(~0UL>>1))
+#define LONG_MIN    (-LONG_MAX - 1)
+#define ULONG_MAX   (~0UL)                                                                                  
+#define LLONG_MAX   ((long long)(~0ULL>>1))
+#define LLONG_MIN   (-LLONG_MAX - 1)
+#define ULLONG_MAX  (~0ULL)
+
+
+
+#define BUG() do { \
+    PRINT_DEBUG("BUG: failure at %s:%d/%s()!\n", __FILE__, __LINE__, __FUNCTION__); \
+} while (0)
+
+#define BUG_ON(condition) do { if (unlikely(condition)) BUG(); } while(0)
+
+
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 
 #endif

@@ -6,13 +6,14 @@
  *    Description:  rbtree(Red-Black tree) implementation adapted from linux
  *                  kernel thus can be used in userspace c program.
  *
- *        Created:  09/02/2012 11:36:11 PM
+ *        Created:  09/02/2012 11:38:12 PM
  *
- *         Author:  Fu Haiping (forhappy), haipingf@gmail.com
- *        Company:  ICT ( Institute Of Computing Technology, CAS )
+ *         Author:  lvpengcheng (xtlx2000), lvpengcheng@gmail.com
+ *        Company:  CDUT && UESTC
  *
  * =============================================================================
  */
+
 
 /*
   Red Black Trees

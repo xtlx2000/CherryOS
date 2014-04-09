@@ -44,7 +44,7 @@ struct backing_dev_info {
     unsigned long ra_pages; /* max readahead in PAGE_CACHE_SIZE units */
     unsigned long state;    /* Always use atomic bitops on this */
     unsigned int capabilities; /* Device capabilities */
-    congested_fn *congested_fn; /* Function pointer if device is md/dm */
+    //congested_fn *congested_fn; /* Function pointer if device is md/dm */
     void *congested_data;   /* Pointer to aux data for congested func */
     void (*unplug_io_fn)(struct backing_dev_info *, struct page *);
     void *unplug_io_data;
@@ -88,7 +88,7 @@ struct kobject {
     struct kset     *kset;
     //struct kobj_type    *ktype;
     //struct sysfs_dirent *sd;
-    struct kref     kref;
+    //struct kref     kref;
     unsigned int state_initialized:1;
     unsigned int state_in_sysfs:1;
     unsigned int state_add_uevent_sent:1;
