@@ -8,6 +8,7 @@
 
 
 #define atomic_t int
+#define u8 unsigned char
 #define u16 unsigned short
 #define u32 unsigned int
 #define u64 unsigned long

@@ -659,8 +659,25 @@ struct file_system_type {
 };	
 
 
-struct file_system_type file_system_type_root;
-struct vfsmount vfsmntlist;
+
+/*
+ * Handling of filesystem drivers list.
+ * Rules:
+ *  Inclusion to/removals from/scanning of list are protected by spinlock.
+ *  During the unload module must call unregister_filesystem().
+ *  We can access the fields of list element if:
+ *      1) spinlock is held or
+ *      2) we hold the reference to the module.
+ *  The latter can be guaranteed by call of try_module_get(); if it
+ *  returned 0 we must skip the element, otherwise we got the reference.
+ *  Once the reference is obtained we can drop the spinlock.
+ */
+
+struct file_system_type *file_systems;
+
+struct vfsmount *vfsmntlist;
+
+LIST_HEAD(super_blocks);
 
 
 
