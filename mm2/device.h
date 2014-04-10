@@ -152,4 +152,24 @@ struct device {
 
 
 
+//OS中虚拟的存储设备
+struct virtual_device
+{
+	void *address;
+	u64 size;
+};
+
+
+#define VIRTUAL_DEVICE_SIZE  (4*1024*1024)//4MB
+
+
+//我们虚拟出4个存储设备
+struct virtual_device device_sda;
+struct virtual_device device_sdb;
+struct virtual_device device_sdc;
+struct virtual_device device_sdd;
+
+
+int init_virtual_device(struct virtual_device *dev, void *address, u64 size);
+
 #endif
