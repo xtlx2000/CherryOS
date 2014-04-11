@@ -56,7 +56,7 @@ struct __wait_queue_head {
 typedef struct __wait_queue_head wait_queue_head_t;
 
 
-#define BITS_PER_LONG 32
+#define BITS_PER_LONG (sizeof(unsigned long))
 
 
 #define USHORT_MAX  ((u16)(~0U))

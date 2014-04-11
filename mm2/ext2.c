@@ -752,19 +752,16 @@ struct file_system_type **find_filesystem(const char *name, unsigned len)
 //格式化设备为ext2
 int format_to_ext2(struct virtual_device *dev)
 {
-	if(INODE_SIZE*INODES_PER_BLOCK!=BLOCK_SIZE){
-		cout <<"bad inode size."
-			 <<INODE_SIZE
-			 <<"*"
-			 <<INODES_PER_BLOCK
-			 <<"!="
-			 <<BLOCK_SIZE
-			 <<endl;
+	//health check
+	if(INODE_SIZE * INODES_PER_BLOCK != BLOCK_SIZE){
+		PRINT_DEBUG("bad inode size. %d * %d != %d\n", INODE_SIZE, INODES_PER_BLOCK, BLOCK_SIZE);
+		return 1;
 	}
 	
 	ext2_super_block super;
 	
 	//block
+	u32 BLOCK_NUM = dev->size / BLOCK_SIZE;
 	super.s_blocks_count = BLOCK_NUM;
 	super.s_blocks_per_group = BLOCK_NUM;
 	super.s_free_blocks_count = BLOCK_NUM;

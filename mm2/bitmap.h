@@ -1,9 +1,9 @@
 #ifndef _BITMAP_H_
 #define _BITMAP_H_
 
-#define WORD 32  
-#define SHIFT 5 ////移动5个位,左移则相当于乘以32,右移相当于除以32取整  
-#define MASK 0x1F //16进制下的31  
+#define BITMAP_WORD 32  
+#define BITMAP_SHIFT 5 ////移动5个位,左移则相当于乘以32,右移相当于除以32取整  
+#define BITMAP_MASK 0x1F //16进制下的31  
 
 struct Bitmap
 {

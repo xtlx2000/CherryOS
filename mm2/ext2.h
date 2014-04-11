@@ -2,6 +2,7 @@
 #define _EXT2_H_
 
 #include "list.h"
+#include "bitmap.h"
 
 
 //block
