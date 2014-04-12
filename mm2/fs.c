@@ -31,14 +31,8 @@ int fs_init()
 
 long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, void *data)
 {
-
+	ext2_VOLUME *volume;
 }
-
-
-
-
-
-
 
 
 
