@@ -31,7 +31,36 @@ int fs_init()
 
 long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, void *data)
 {
-	ext2_VOLUME *volume;
+	struct ext2_super_block *super;
+	char *buffer;
+
+	super = (struct ext2_super_block *)malloc(sizeof(struct ext2_super_block));
+	if(super == NULL){
+		free(super);
+		return NULL;
+	}
+
+	//从磁盘读取super block
+	ext2_get_super(super);
+	if(super->s_magic != EXT2_SUPER_MAGIC){
+		free(super);
+		return NULL;
+	}
+
+	//入队
+	struct file_system_type **p;
+
+    //write_lock(&file_systems_lock);
+    p = find_filesystem("ext2", sizeof("ext2"));
+	
+    if (*p){//found
+        list_add(&super->filesystem_type, &(*p->fs_supers));
+    }else{//not found
+        return -1;
+    }
+    //write_unlock(&file_systems_lock);
+
+	
 }
 
 

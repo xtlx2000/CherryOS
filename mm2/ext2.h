@@ -31,6 +31,8 @@ struct ext2_super_block
 
 	u32 s_first_ino;			//第一个非保留的inode
 	u32 s_inode_size;			//inode结构的大小
+
+	list_head  filesystem_type;
 };
 
 
