@@ -111,6 +111,8 @@ int main()
 
 
 	// 3 buffer cache
+	PRINT_DEBUG("\n================== cache Test ===========\n");
+	cache_init();
 
 	
 	return 0;

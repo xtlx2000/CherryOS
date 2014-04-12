@@ -29,6 +29,25 @@ int fs_init()
 }
 
 
+long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, void *data)
+{
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #define AT_FDCWD        (-100)    /* Special value used to indicate
                                            openat should use the current
                                            working directory. */

@@ -25,7 +25,7 @@
 
 int fs_init();
 
-
+long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, void *data);
 long sys_open(const char *filename, int flags, int mode);
 long sys_close(unsigned int fd);
 ssize_t sys_read(unsigned int fd, char *buf, size_t count);
