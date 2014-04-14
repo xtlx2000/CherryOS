@@ -66,6 +66,44 @@ long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, 
 
 
 
+struct DIR *sys_opendir(const char *path)
+{
+	struct ext2_DIR *dir;
+	int ino;
+
+	struct ext2_inode *inode;
+	int ret;
+
+	ino = ext2_seek_name(name);
+
+	if(ino == 0){
+		return NULL;
+	}
+
+	inode = (struct ext2_inode*)malloc(sizeof(struct ext2_inode));
+	if(inode == NULL){
+		return NULL;
+	}
+
+	ret = ext2_get_inode(ino, inode);
+	if(ret == -1){
+		free(inode);
+		return NULL;
+	}
+
+	if(!S_ISDIR(inode->i_mode)){
+		free(inode);
+		return NULL;
+	}
+
+	dir = (struct ext2_DIR*)malloc(sizeof(struct ext2_DIR));
+	if(dir == NULL){
+		free(inode);
+		return NULL;
+	}
+
+	//dir
+}
 
 
 
