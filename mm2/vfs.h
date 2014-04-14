@@ -644,7 +644,8 @@ struct file_system_type {
 	int fs_flags;/*文件系统类型标志*/  
 	int (*get_sb) (struct file_system_type *, int,	
 			   const char *, void *, struct vfsmount *);/*读超级快的方法*/	
-	void (*kill_sb) (struct super_block *);/*删除超级块的方法*/  
+	void (*kill_sb) (struct super_block *);/*删除超级块的方法*/ 
+	int (*mount) ();
 	//struct module *owner;/*指向实现文件系统的模块指针*/  
 	struct file_system_type * next;/*指向文件系统类型链表中下一个元素的指针*/  
 	struct list_head fs_supers;/*具有相同文件系统类型的超级块对象链表头*/  

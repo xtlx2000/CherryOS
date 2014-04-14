@@ -151,12 +151,16 @@ struct device {
 };
 
 
+#define MAX_DEVICE_NAMELEN	10
 
 //OS中虚拟的存储设备
 struct virtual_device
 {
+	char name[MAX_DEVICE_NAMELEN];
 	void *address;
 	u64 size;
+
+	list_head dev_list;
 };
 
 
@@ -169,7 +173,8 @@ struct virtual_device device_sdb;
 struct virtual_device device_sdc;
 struct virtual_device device_sdd;
 
-
+INIT_LIST_HEAD(device_list);
+int device_init();
 int init_virtual_device(struct virtual_device *dev, void *address, u64 size);
 
 #endif

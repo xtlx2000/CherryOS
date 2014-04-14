@@ -10,19 +10,19 @@ int fs_init()
 	// 2 real fs register
 	init_ext2_fs();
 
-	// 3 real device detect, we use sda
-	void *addr = malloc(VIRTUAL_DEVICE_SIZE);
-	int ret = 0;
-	ret = init_virtual_device(&device_sda, addr, VIRTUAL_DEVICE_SIZE);
-	if(ret != 0){
-		PRINT_DEBUG("init_virtual_device error.\n");
-		return ret;
-	}
+	// 3 real device detect, we use sda and format it to ext2
+	device_init();
 
 	// 4 format sda to ext2
 	ret = format_to_ext2(&device_sda);
 
-	// 5 mount sda
+	// 5 mount sda and prepare data
+	mount(&device_sda, "ext2Mounted");
+	mkdir("/ext2Mounted/bar");
+	int fd = open("/ext2Mounted/foo.txt");
+	write(fd, "hello world.", 13);
+	close(fd);
+	
 	
 	
 	return 0;
@@ -41,7 +41,7 @@ long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, 
 	}
 
 	//从磁盘读取super block
-	ext2_get_super(super);
+	ext2_get_super(dev_name, super);
 	if(super->s_magic != EXT2_SUPER_MAGIC){
 		free(super);
 		return NULL;
@@ -60,6 +60,53 @@ long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, 
     }
     //write_unlock(&file_systems_lock);
 
+	
+}
+
+
+int ext2_get_super(char *dev_name, struct ext2_super_block *super)
+{	
+	
+	struct ext2_super_block *read = NULL;
+	struct virtual_device *dev_pos = NULL;
+	struct virtual_device *dev = NULL;
+
+
+	list_for_each_entry(dev, &device_list, dev_list){
+		if(dev->name "ext2"){
+			dev = NULL;
+			break;
+		}
+	}
+
+	if(!dev){
+		return -1;
+	}
+
+	read = (struct ext2_super_block *)dev;
+	
+	//NOTE: I want to persistent the super to disk soon, so i write code like below
+	super->s_inodes_count = read->s_inodes_count;			//inode数目//
+	super->s_blocks_count = read->s_blocks_count;			//block数目//
+	super->s_r_blocks_count = read->s_r_blocks_count;		//已分配的块数目//
+	super->s_free_blocks_count = read->s_free_blocks_count;	//空闲块数目//
+	super->s_free_inodes_count = read->s_free_inodes_count;	//空闲inode数目//
+	super->s_first_data_block = read->s_first_data_block;		//第一个数据块//
+	super->s_log_block_size = read->s_log_block_size;		//块长度//
+	super->s_log_frag_size = read->s_log_frag_size;		//碎片长度//
+	super->s_blocks_per_group = read->s_blocks_per_group;		//每个快组包含的快数目//
+	super->s_frags_per_group = read->s_frags_per_group;		//每个快组包含的碎片//
+	super->s_inodes_per_group = read->s_inodes_per_group;		//每个快组的inode数目//
+	super->s_state = read->s_state;				//zhuangtai
+
+	super->s_first_ino = read->s_first_ino;			//第一个非保留的inode
+	super->s_inode_size = read->s_inode_size;			//inode结构的大小
+
+	super->dev = read->dev;
+
+	//list_head ignore
+	
+	
 	
 }
 
@@ -107,6 +154,48 @@ struct DIR *sys_opendir(const char *path)
 
 
 
+unsigned int ext2_seek_name(const char *name)
+{
+	struct ext2_inode inode;
+	int ret;
+	unsigned int ino;
+	off_t index;
+	struct ext2_dir_entry_2 entry;
+
+	ino = EXT2_ROOT_INO;
+	//循环处理每个路径分量
+	while(1) {
+		while (*name == '\\')
+			name++;
+		if (!*name)
+		    break;
+		ret = ext2_get_inode(volume, ino, &inode);
+		if (ret == -1)
+			return 0;
+		index = 0;
+		//循环读取每个路径分量(目录)的所有dir_entry条目
+		//逐个跟name比较，如果相同，则记录ino,跳出二级循环
+		while (1) {
+			index = ext2_dir_entry(volume, &inode, index, &entry);
+			if (index == -1)
+				return 0;
+			ret = strncmp(name, entry.name, entry.name_len);
+			if (ret == 0  &&
+			    (name[entry.name_len] == 0 ||
+			     name[entry.name_len] == '\\')) {
+			     	ino = entry.inode;
+				break;
+			}
+		}
+		name += entry.name_len;
+	}
+
+	return ino;//最终的这个ino就是最后一级目录的ino
+}
+
+
+
+
 
 
 #define AT_FDCWD        (-100)    /* Special value used to indicate
@@ -118,9 +207,60 @@ long sys_open(const char *filename, int flags, int mode)
 {   
     long ret;
     
-    ret = do_sys_open( AT_FDCWD, filename, flags, mode);
+    //ret = do_sys_open( AT_FDCWD, filename, flags, mode);
     /* avoid REGPARM breakage on x86: */
     //asmlinkage_protect(3, ret, filename, flags, mode);
+
+
+	ext2_FILE *file;
+	struct ext2_inode *inode;
+	int ino;
+	int ret;
+
+	ino = ext2_seek_name(volume, pathname);
+	if (ino == 0)
+		return NULL;
+
+	inode = (struct ext2_inode*)malloc(sizeof(struct ext2_inode));
+	if (inode == NULL)
+		return NULL;
+
+	ret = ext2_get_inode(volume, ino, inode);
+	if (ret == -1) {
+		free(inode);
+		return NULL;
+	}
+	if (S_ISLNK(inode->i_mode)) {
+		static char buffer[1024];
+		int i, last = 0;
+		strcpy(buffer, pathname);
+		for (i = 0; buffer[i]; i++)
+			if (buffer[i] == '\\')
+				last = i;
+		buffer[last] = '\\';
+		strcpy(buffer + last + 1, (char*)inode->i_block);
+		ino = ext2_seek_name((ext2_VOLUME*)volume, buffer);
+		if (ino == 0) {
+			free(inode);
+			return NULL;
+		}
+		ret = ext2_get_inode((ext2_VOLUME*)volume, ino, inode);
+		if (ret == -1) {
+			free(inode);
+			return NULL;
+		}
+	}
+
+	file = (ext2_FILE*)malloc(sizeof(ext2_FILE));
+	if (file == NULL) {
+		free(inode);
+		return NULL;
+	}
+	file->volume = volume;
+	file->inode = inode;
+	file->offset = 0;
+	file->path = strdup(pathname);
+    
     return ret;
 }
 
@@ -1517,19 +1657,15 @@ out_unlock:
 
 ssize_t sys_read(unsigned int fd, char * buf, size_t count)                               
 {
-    struct file *file;
-    ssize_t ret = -EBADF;
-    int fput_needed;
+	int ret;
 
-    file = fget_light(fd, &fput_needed);
-    if (file) {
-        loff_t pos = file_pos_read(file);
-        ret = vfs_read(file, buf, count, &pos);
-        file_pos_write(file, pos);
-        fput_light(file, fput_needed);
-    }   
+	ret = ext2_read_data(file->volume, file->inode, file->offset,
+			     buf, count);
+	if (ret == -1)
+		return -1;
+	file->offset += ret;
+	return ret;
 
-    return ret;
 }
 
 
