@@ -141,6 +141,21 @@ struct dir_entry {
 };
 
 
+#define EXT2_NAME_LEN 60
+
+/*
+ * The new version of the directory entry.  Since EXT2 structures are
+ * stored in intel byte order, and the name_len field could never be
+ * bigger than 255 chars, it's safe to reclaim the extra byte for the
+ * file_type field.
+ */
+struct ext2_dir_entry_2 {
+	u32	inode;			/* Inode number */
+	u16	rec_len;		/* Directory entry length */
+	u8	name_len;		/* Name length */
+	u8	file_type;
+	char	name[EXT2_NAME_LEN];	/* File name */
+};
 
 
 
@@ -188,6 +203,7 @@ struct ext2_block_alloc_info {
 };
 
 
+#define EXT2_ROOT_INO 0
 
 
 

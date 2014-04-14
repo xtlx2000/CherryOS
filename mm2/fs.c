@@ -194,6 +194,208 @@ unsigned int ext2_seek_name(const char *name)
 }
 
 
+off_t ext2_dir_entry(ext2_VOLUME *volume, struct ext2_inode *inode,
+		     off_t index, struct ext2_dir_entry_2 *entry)
+{
+	int ret;
+
+	ret = ext2_read_data(volume, inode, index,
+			     (char*)entry, sizeof(*entry));
+	if (ret == -1)
+		return -1;
+
+        entry->inode = __le32_to_cpu(entry->inode);
+        entry->rec_len = __le16_to_cpu(entry->rec_len);
+	return index + entry->rec_len;
+}
+
+
+
+int ext2_read_data(ext2_VOLUME* volume, struct ext2_inode *inode,
+		   off_t offset, char *buffer, size_t length)
+{
+	unsigned int logical, physical;
+	int blocksize = EXT2_BLOCK_SIZE(volume->super);
+	int shift;
+	size_t read;
+
+	if (offset >= inode->i_size)
+		return -1;
+
+	if (offset + length >= inode->i_size)
+		length = inode->i_size - offset;
+
+	read = 0;
+	logical = offset / blocksize;
+	shift = offset % blocksize;
+
+	if (shift) {
+		physical = ext2_get_block_addr(volume, inode, logical);
+		ext2_read_block(volume, physical);
+
+		if (length < blocksize - shift) {
+			memcpy(buffer, volume->buffer + shift, length);
+			return length;
+		}
+		read += blocksize - shift;
+		memcpy(buffer, volume->buffer + shift, read);
+
+		buffer += read;
+		length -= read;
+		logical++;
+	}
+
+	while (length) {
+		physical = ext2_get_block_addr(volume, inode, logical);
+		ext2_read_block(volume, physical);
+
+		if (length < blocksize) {
+			memcpy(buffer, volume->buffer, length);
+			read += length;
+			return read;
+		}
+		memcpy(buffer, volume->buffer, blocksize);
+
+		buffer += blocksize;
+		length -= blocksize;
+		read += blocksize;
+		logical++;
+	}
+
+	return read;
+}
+
+
+
+unsigned int ext2_get_block_addr(ext2_VOLUME* volume, struct ext2_inode *inode,
+				 unsigned int logical)
+{
+	unsigned int physical;
+	unsigned int addr_per_block;
+
+	/* direct */
+
+	if (logical < EXT2_NDIR_BLOCKS) {
+		physical = inode->i_block[logical];
+		return physical;
+	}
+
+	/* indirect */
+
+	logical -= EXT2_NDIR_BLOCKS;
+
+	addr_per_block = EXT2_ADDR_PER_BLOCK (volume->super);
+	if (logical < addr_per_block) {
+		ext2_read_block(volume, inode->i_block[EXT2_IND_BLOCK]);
+		physical = __le32_to_cpu(((unsigned int *)volume->buffer)[logical]);
+		return physical;
+	}
+
+	/* double indirect */
+
+	logical -=  addr_per_block;
+
+	if (logical < addr_per_block * addr_per_block) {
+		ext2_read_block(volume, inode->i_block[EXT2_DIND_BLOCK]);
+		physical = __le32_to_cpu(((unsigned int *)volume->buffer)
+						[logical / addr_per_block]);
+		ext2_read_block(volume, physical);
+		physical = __le32_to_cpu(((unsigned int *)volume->buffer)
+						[logical % addr_per_block]);
+		return physical;
+	}
+
+	/* triple indirect */
+
+	logical -= addr_per_block * addr_per_block;
+	ext2_read_block(volume, inode->i_block[EXT2_DIND_BLOCK]);
+	physical = __le32_to_cpu(((unsigned int *)volume->buffer)
+				[logical / (addr_per_block * addr_per_block)]);
+	ext2_read_block(volume, physical);
+	logical = logical % (addr_per_block * addr_per_block);
+	physical = __le32_to_cpu(((unsigned int *)volume->buffer)[logical / addr_per_block]);
+	ext2_read_block(volume, physical);
+	physical = __le32_to_cpu(((unsigned int *)volume->buffer)[logical % addr_per_block]);
+	return physical;
+}
+
+void ext2_read_block(ext2_VOLUME* volume, unsigned int fsblock)
+{
+	llong offset;
+
+	if (fsblock == volume->current)
+		return;
+
+	volume->current = fsblock;
+	offset = fsblock * EXT2_BLOCK_SIZE(volume->super);
+
+	seek_io(volume->fd, offset);
+	read_io(volume->fd, volume->buffer, EXT2_BLOCK_SIZE(volume->super));
+}
+
+
+
+
+
+
+
+int ext2_get_inode(unsigned int ino, struct ext2_inode *inode)
+{
+	struct ext2_group_desc desc;
+	unsigned int block;
+	unsigned int group_id;
+	unsigned int offset;
+	struct ext2_inode *le_inode;
+	int i;
+
+	ino--;
+
+	group_id = ino / EXT2_INODES_PER_GROUP(volume->super);
+	ext2_get_group_desc(volume, group_id, &desc);
+
+	ino %= EXT2_INODES_PER_GROUP(volume->super);
+
+	block = desc.bg_inode_table;
+	block += ino / (EXT2_BLOCK_SIZE(volume->super) /
+			EXT2_INODE_SIZE(volume->super));
+	ext2_read_block(volume, block);
+
+	offset = ino % (EXT2_BLOCK_SIZE(volume->super) /
+			EXT2_INODE_SIZE(volume->super));
+	offset *= EXT2_INODE_SIZE(volume->super);
+
+	le_inode = (struct ext2_inode *)(volume->buffer + offset);
+
+	inode->i_mode = __le16_to_cpu(le_inode->i_mode);
+	inode->i_uid = __le16_to_cpu(le_inode->i_uid);
+	inode->i_size = __le32_to_cpu(le_inode->i_size);
+	inode->i_atime = __le32_to_cpu(le_inode->i_atime);
+	inode->i_ctime = __le32_to_cpu(le_inode->i_ctime);
+	inode->i_mtime = __le32_to_cpu(le_inode->i_mtime);
+	inode->i_dtime = __le32_to_cpu(le_inode->i_dtime);
+	inode->i_gid = __le16_to_cpu(le_inode->i_gid);
+	inode->i_links_count = __le16_to_cpu(le_inode->i_links_count);
+	inode->i_blocks = __le32_to_cpu(le_inode->i_blocks);
+	inode->i_flags = __le32_to_cpu(le_inode->i_flags);
+	if (S_ISLNK(inode->i_mode)) {
+		memcpy(inode->i_block, le_inode->i_block, EXT2_N_BLOCKS * 4);
+	} else {
+		for (i = 0; i < EXT2_N_BLOCKS; i++)
+			inode->i_block[i] = __le32_to_cpu(le_inode->i_block[i]);
+        }
+	inode->i_generation = __le32_to_cpu(le_inode->i_generation);
+	inode->i_file_acl = __le32_to_cpu(le_inode->i_file_acl);
+	inode->i_dir_acl = __le32_to_cpu(le_inode->i_dir_acl);
+	inode->i_faddr = __le32_to_cpu(le_inode->i_faddr);
+	inode->osd2.linux2.l_i_frag = le_inode->osd2.linux2.l_i_frag;
+	inode->osd2.linux2.l_i_fsize = le_inode->osd2.linux2.l_i_fsize;
+	inode->osd2.linux2.l_i_uid_high =
+			__le16_to_cpu(le_inode->osd2.linux2.l_i_uid_high);
+	inode->osd2.linux2.l_i_gid_high =
+			__le16_to_cpu(le_inode->osd2.linux2.l_i_gid_high);
+	return 0;
+}
+
 
 
 
