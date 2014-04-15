@@ -113,7 +113,7 @@ int ext2_get_super(char *dev_name, struct ext2_super_block *super)
 
 
 
-struct DIR *sys_opendir(const char *path)
+struct DIR *sys_opendir(const char *name)
 {
 	struct ext2_DIR *dir;
 	int ino;
