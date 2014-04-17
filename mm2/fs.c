@@ -40,7 +40,7 @@ long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, 
 		return NULL;
 	}
 
-	//从磁盘读取super block
+	//根据device从磁盘读取super block
 	ext2_get_super(dev_name, super);
 	if(super->s_magic != EXT2_SUPER_MAGIC){
 		free(super);
@@ -52,7 +52,6 @@ long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, 
 
     //write_lock(&file_systems_lock);
     p = find_filesystem("ext2", sizeof("ext2"));
-	
     if (*p){//found
         list_add(&super->filesystem_type, &(*p->fs_supers));
     }else{//not found
@@ -72,9 +71,9 @@ int ext2_get_super(char *dev_name, struct ext2_super_block *super)
 	struct virtual_device *dev = NULL;
 
 
-	list_for_each_entry(dev, &device_list, dev_list){
-		if(dev->name "ext2"){
-			dev = NULL;
+	list_for_each_entry(dev_pos, &device_list, dev_list){
+		if(strcmp(dev_pos->name, dev_name) == 0){
+			dev = dev_pos;
 			break;
 		}
 	}
@@ -101,8 +100,11 @@ int ext2_get_super(char *dev_name, struct ext2_super_block *super)
 
 	super->s_first_ino = read->s_first_ino;			//第一个非保留的inode
 	super->s_inode_size = read->s_inode_size;			//inode结构的大小
+	
+	super->s_magic = read->s_magic;
 
 	super->dev = read->dev;
+
 
 	//list_head ignore
 	
@@ -165,18 +167,18 @@ unsigned int ext2_seek_name(const char *name)
 	ino = EXT2_ROOT_INO;
 	//循环处理每个路径分量
 	while(1) {
-		while (*name == '\\')
+		while (*name == '/')
 			name++;
 		if (!*name)
 		    break;
-		ret = ext2_get_inode(volume, ino, &inode);
+		ret = ext2_get_inode(ino, &inode);
 		if (ret == -1)
 			return 0;
 		index = 0;
 		//循环读取每个路径分量(目录)的所有dir_entry条目
 		//逐个跟name比较，如果相同，则记录ino,跳出二级循环
 		while (1) {
-			index = ext2_dir_entry(volume, &inode, index, &entry);
+			index = ext2_dir_entry(&inode, index, &entry);
 			if (index == -1)
 				return 0;
 			ret = strncmp(name, entry.name, entry.name_len);
@@ -194,12 +196,12 @@ unsigned int ext2_seek_name(const char *name)
 }
 
 
-off_t ext2_dir_entry(ext2_VOLUME *volume, struct ext2_inode *inode,
+off_t ext2_dir_entry(struct ext2_inode *inode,
 		     off_t index, struct ext2_dir_entry_2 *entry)
 {
 	int ret;
 
-	ret = ext2_read_data(volume, inode, index,
+	ret = ext2_read_data(inode, index,
 			     (char*)entry, sizeof(*entry));
 	if (ret == -1)
 		return -1;
@@ -211,11 +213,11 @@ off_t ext2_dir_entry(ext2_VOLUME *volume, struct ext2_inode *inode,
 
 
 
-int ext2_read_data(ext2_VOLUME* volume, struct ext2_inode *inode,
+int ext2_read_data(struct ext2_inode *inode,
 		   off_t offset, char *buffer, size_t length)
 {
 	unsigned int logical, physical;
-	int blocksize = EXT2_BLOCK_SIZE(volume->super);
+	int blocksize = EXT2_BLOCK_SIZE(super_block);
 	int shift;
 	size_t read;
 
@@ -335,6 +337,28 @@ void ext2_read_block(ext2_VOLUME* volume, unsigned int fsblock)
 
 
 
+void ext2_get_group_desc(ext2_VOLUME* volume,
+		   int group_id, struct ext2_group_desc *gdp)
+{
+	unsigned int block, offset;
+	struct ext2_group_desc *le_gdp;
+
+	block = 1 + volume->super->s_first_data_block;
+	block += group_id / EXT2_DESC_PER_BLOCK(volume->super);
+	ext2_read_block(volume,  block);
+
+	offset = group_id % EXT2_DESC_PER_BLOCK(volume->super);
+	offset *= sizeof(*gdp);
+
+	le_gdp = (struct ext2_group_desc *)(volume->buffer + offset);
+
+	gdp->bg_block_bitmap = __le32_to_cpu(le_gdp->bg_block_bitmap);
+	gdp->bg_inode_bitmap = __le32_to_cpu(le_gdp->bg_inode_bitmap);
+	gdp->bg_inode_table = __le32_to_cpu(le_gdp->bg_inode_table);
+	gdp->bg_free_blocks_count = __le16_to_cpu(le_gdp->bg_free_blocks_count);
+	gdp->bg_free_inodes_count = __le16_to_cpu(le_gdp->bg_free_inodes_count);
+	gdp->bg_used_dirs_count = __le16_to_cpu(le_gdp->bg_used_dirs_count);
+}
 
 
 
