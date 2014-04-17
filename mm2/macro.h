@@ -14,7 +14,11 @@
 #define u64 unsigned long
 
 
-#define s8  unsigned int
+#define s8 unsigned char
+#define s16 unsigned short
+#define s32 unsigned int
+#define s64 unsigned long
+
 
 
 
@@ -22,7 +26,9 @@
 #define pgoff_t int
 #define gfp_t int
 
-#define loff_t int
+#define loff_t long
+#define off_t long
+
 
 #define ssize_t unsigned long
 #define size_t unsigned long
