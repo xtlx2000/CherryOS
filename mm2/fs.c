@@ -107,7 +107,8 @@ int ext2_get_super(char *dev_name, struct ext2_super_block *super)
 
 
 	//list_head ignore
-	
+
+	return 0;
 	
 	
 }
