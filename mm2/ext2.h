@@ -507,21 +507,21 @@ struct ext2_block_alloc_info {
 
 
 typedef struct ext2_DIR {
-        ext2_VOLUME *volume;
+    ext2_VOLUME *volume;
 	struct ext2_inode *inode;
 	off_t index;
 } ext2_DIR;
 
 
 typedef struct ext2_VOLUME {
-        int fd;
+    int fd;
 	struct ext2_super_block *super;
 	unsigned int current;
 	char *buffer;
 } ext2_VOLUME;
 
 typedef struct ext2_FILE {
-        ext2_VOLUME *volume;
+    ext2_VOLUME *volume;
 	struct ext2_inode *inode;
 	off_t offset;
 	char *path;

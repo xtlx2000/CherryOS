@@ -26,6 +26,17 @@
 
 
 
+struct topDir{
+	char topdir[MAX_DEVICE_NAMELEN];
+	void *super_block;
+};
+
+#define TOPDIRSNUM 10
+
+struct topDir topDirs[TOPDIRSNUM];
+int DirsNum;
+void *current_sb;
+
 
 int fs_init();
 

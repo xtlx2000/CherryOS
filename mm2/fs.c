@@ -28,7 +28,7 @@ int fs_init()
 	return 0;
 }
 
-
+//OK
 long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, void *data)
 {
 	struct ext2_super_block *super;
@@ -59,10 +59,20 @@ long sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, 
     }
     //write_unlock(&file_systems_lock);
 
+	//write topDirs
+	memset(topDirs[DirsNum].dev_name, 0, MAX_DEVICE_NAMELEN);
+	memcpy(topDirs[DirsNum].dev_name, dir_name, strlen(dir_name));
+	topDirs[DirsNum].super_block = super;
+	DirsNum++;
+
+	
+	current_sb = super;
+
+	return 0;
 	
 }
 
-
+//OK
 int ext2_get_super(char *dev_name, struct ext2_super_block *super)
 {	
 	
@@ -116,7 +126,7 @@ int ext2_get_super(char *dev_name, struct ext2_super_block *super)
 
 
 
-struct DIR *sys_opendir(const char *name)
+struct ext2_DIR *sys_opendir(const char *name)
 {
 	struct ext2_DIR *dir;
 	int ino;
@@ -160,6 +170,7 @@ struct DIR *sys_opendir(const char *name)
 unsigned int ext2_seek_name(const char *name)
 {
 	struct ext2_inode inode;
+	struct ext2_super_block *super = NULL;
 	int ret;
 	unsigned int ino;
 	off_t index;
@@ -172,7 +183,19 @@ unsigned int ext2_seek_name(const char *name)
 			name++;
 		if (!*name)
 		    break;
-		ret = ext2_get_inode(ino, &inode);
+
+		int i;
+		for(i = 0; i < TOPDIRSNUM; i++){
+			if(strcmp(topDirs[i].topdir, name) == 0){
+				super = topDirs[i].super_block;
+			}
+		}
+
+		if(!super){
+			return -1;
+		}
+		    
+		ret = ext2_get_inode(super, ino, &inode);
 		if (ret == -1)
 			return 0;
 		index = 0;
@@ -185,7 +208,7 @@ unsigned int ext2_seek_name(const char *name)
 			ret = strncmp(name, entry.name, entry.name_len);
 			if (ret == 0  &&
 			    (name[entry.name_len] == 0 ||
-			     name[entry.name_len] == '\\')) {
+			     name[entry.name_len] == '/')) {
 			     	ino = entry.inode;
 				break;
 			}
@@ -338,17 +361,17 @@ void ext2_read_block(ext2_VOLUME* volume, unsigned int fsblock)
 
 
 
-void ext2_get_group_desc(ext2_VOLUME* volume,
+void ext2_get_group_desc(struct ext2_super_block super,
 		   int group_id, struct ext2_group_desc *gdp)
 {
 	unsigned int block, offset;
 	struct ext2_group_desc *le_gdp;
 
-	block = 1 + volume->super->s_first_data_block;
-	block += group_id / EXT2_DESC_PER_BLOCK(volume->super);
+	block = 1 + super->s_first_data_block;
+	block += group_id / EXT2_DESC_PER_BLOCK(super);
 	ext2_read_block(volume,  block);
 
-	offset = group_id % EXT2_DESC_PER_BLOCK(volume->super);
+	offset = group_id % EXT2_DESC_PER_BLOCK(super);
 	offset *= sizeof(*gdp);
 
 	le_gdp = (struct ext2_group_desc *)(volume->buffer + offset);
@@ -364,7 +387,7 @@ void ext2_get_group_desc(ext2_VOLUME* volume,
 
 
 
-int ext2_get_inode(unsigned int ino, struct ext2_inode *inode)
+int ext2_get_inode(struct ext2_super_block *super, unsigned int ino, struct ext2_inode *inode)
 {
 	struct ext2_group_desc desc;
 	unsigned int block;
@@ -375,19 +398,19 @@ int ext2_get_inode(unsigned int ino, struct ext2_inode *inode)
 
 	ino--;
 
-	group_id = ino / EXT2_INODES_PER_GROUP(volume->super);
-	ext2_get_group_desc(volume, group_id, &desc);
+	group_id = ino / EXT2_INODES_PER_GROUP(super);
+	ext2_get_group_desc(super, group_id, &desc);
 
-	ino %= EXT2_INODES_PER_GROUP(volume->super);
+	ino %= EXT2_INODES_PER_GROUP(super);
 
 	block = desc.bg_inode_table;
-	block += ino / (EXT2_BLOCK_SIZE(volume->super) /
-			EXT2_INODE_SIZE(volume->super));
-	ext2_read_block(volume, block);
+	block += ino / (EXT2_BLOCK_SIZE(super) /
+			EXT2_INODE_SIZE(super));
+	ext2_read_block(block);
 
-	offset = ino % (EXT2_BLOCK_SIZE(volume->super) /
-			EXT2_INODE_SIZE(volume->super));
-	offset *= EXT2_INODE_SIZE(volume->super);
+	offset = ino % (EXT2_BLOCK_SIZE(super) /
+			EXT2_INODE_SIZE(super));
+	offset *= EXT2_INODE_SIZE(super);
 
 	le_inode = (struct ext2_inode *)(volume->buffer + offset);
 
