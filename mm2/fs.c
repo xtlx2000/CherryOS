@@ -177,6 +177,23 @@ unsigned int ext2_seek_name(const char *name)
 	struct ext2_dir_entry_2 entry;
 
 	ino = EXT2_ROOT_INO;
+
+
+	while(*name == '/')
+		name++;
+	int i;
+	for(i = 0; i < TOPDIRSNUM; i++){
+		if(strcmp(topDirs[i].topdir, name) == 0){
+			super = topDirs[i].super_block;
+		}
+	}
+
+	if(!super){
+		return -1;
+	}
+
+
+	
 	//循环处理每个路径分量
 	while(1) {
 		while (*name == '/')
@@ -184,16 +201,7 @@ unsigned int ext2_seek_name(const char *name)
 		if (!*name)
 		    break;
 
-		int i;
-		for(i = 0; i < TOPDIRSNUM; i++){
-			if(strcmp(topDirs[i].topdir, name) == 0){
-				super = topDirs[i].super_block;
-			}
-		}
-
-		if(!super){
-			return -1;
-		}
+		
 		    
 		ret = ext2_get_inode(super, ino, &inode);
 		if (ret == -1)
