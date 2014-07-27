@@ -10,7 +10,8 @@ version 2.0 has been completed immediately...
 version 2.0 has much more advanced than v1.0. the kernel is a simple imitation of linux kernel 2.6.27
 
 
-Demo:
+Demo
 -----------------------------------
-[image]: doc/cherryos_ui1.png "1"
-[image]: doc/cherryos_ui2.png "2"
+![github](doc/cherryos_ui1.png "github")
+
+![github](doc/cherryos_ui2.png "github")
